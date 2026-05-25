@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Issue Triage Agent — 智能分诊演示</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0a0a0f;--card:#12121a;--border:#1e1e2e;
+  --text:#e0e0e0;--dim:#666;--accent:#6c5ce7;--accent2:#00cec9;
+  --green:#00b894;--orange:#fdcb6e;--red:#e17055;--blue:#74b9ff;
+  --glow:rgba(108,92,231,0.15);
+}
+body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;overflow-x:hidden}
+.container{max-width:1100px;margin:0 auto;padding:0 24px}
+
+/* Hero */
+.hero{text-align:center;padding:80px 0 60px;position:relative}
+.hero::before{content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);width:600px;height:600px;background:radial-gradient(circle,var(--glow) 0%,transparent 70%);pointer-events:none;z-index:0}
+.hero h1{font-size:2.8em;font-weight:700;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;position:relative;z-index:1}
+.hero p{font-size:1.15em;color:var(--dim);margin-top:12px;position:relative;z-index:1}
+.badge{display:inline-block;background:var(--card);border:1px solid var(--border);border-radius:20px;padding:4px 14px;font-size:0.8em;color:var(--accent2);margin-top:16px}
+
+/* Architecture */
+.section{padding:50px 0}
+.section-title{font-size:1.5em;font-weight:600;margin-bottom:30px;text-align:center}
+.arch-grid{display:grid;grid-template-columns:1fr auto 1fr auto 1fr;gap:16px;align-items:center;margin-bottom:40px}
+.arch-box{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:24px;text-align:center;transition:all .3s}
+.arch-box:hover{border-color:var(--accent);box-shadow:0 0 20px var(--glow)}
+.arch-icon{font-size:2em;margin-bottom:8px}
+.arch-label{font-weight:600;font-size:1.05em}
+.arch-desc{font-size:0.85em;color:var(--dim);margin-top:6px}
+.arrow{color:var(--accent);font-size:1.5em;opacity:0.5}
+
+/* Stats */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;margin:40px 0}
+.stat-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:28px;text-align:center}
+.stat-num{font-size:2.2em;font-weight:700;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.stat-label{color:var(--dim);font-size:0.9em;margin-top:4px}
+
+/* Demo */
+.demo-area{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:36px;margin-top:20px}
+.input-group{margin-bottom:20px}
+.input-group label{display:block;font-size:0.9em;color:var(--dim);margin-bottom:6px}
+.input-group input,.input-group textarea{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 16px;color:var(--text);font-size:0.95em;font-family:inherit;transition:border-color .2s}
+.input-group input:focus,.input-group textarea:focus{outline:none;border-color:var(--accent)}
+.input-group textarea{height:120px;resize:vertical}
+.btn{display:inline-flex;align-items:center;gap:8px;background:linear-gradient(135deg,var(--accent),#a29bfe);color:#fff;border:none;border-radius:10px;padding:14px 36px;font-size:1.05em;font-weight:600;cursor:pointer;transition:all .3s}
+.btn:hover{transform:translateY(-2px);box-shadow:0 8px 25px rgba(108,92,231,0.3)}
+.btn:disabled{opacity:0.5;cursor:not-allowed;transform:none}
+.btn-outline{background:transparent;border:1px solid var(--border);color:var(--dim);padding:10px 20px;font-size:0.9em}
+.btn-outline:hover{border-color:var(--accent);color:var(--text);box-shadow:none}
+
+/* Agent pipeline visualization */
+.pipeline{margin:30px 0;display:none}
+.pipeline.active{display:block}
+.agent-row{display:flex;gap:16px;margin-bottom:16px}
+.agent-card{flex:1;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:20px;position:relative;overflow:hidden;opacity:0.4;transition:all .5s}
+.agent-card.active{opacity:1;border-color:var(--accent);box-shadow:0 0 15px var(--glow)}
+.agent-card.done{opacity:1;border-color:var(--green)}
+.agent-card .agent-name{font-weight:600;font-size:0.95em;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.agent-card .agent-status{font-size:0.8em;color:var(--dim)}
+.agent-card .agent-result{margin-top:10px;font-size:0.85em;color:var(--accent2);display:none}
+.agent-card.done .agent-result{display:block}
+.progress-bar{height:3px;background:var(--border);border-radius:2px;margin-top:10px;overflow:hidden}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:2px;width:0;transition:width .3s}
+.spinner{display:inline-block;width:14px;height:14px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.pulse{animation:pulse 1.5s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:0.4}50%{opacity:1}}
+
+/* Report */
+.report{background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:28px;margin-top:20px;display:none}
+.report.active{display:block;animation:fadeIn .5s}
+@keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.report-header{display:flex;align-items:center;gap:10px;margin-bottom:16px;font-size:1.1em;font-weight:600}
+.report-row{display:flex;gap:12px;margin-bottom:12px;flex-wrap:wrap}
+.tag{display:inline-block;padding:4px 12px;border-radius:6px;font-size:0.85em;font-weight:500}
+.tag-bug{background:rgba(225,112,85,0.15);color:var(--red)}
+.tag-feature{background:rgba(108,92,231,0.15);color:var(--accent)}
+.tag-high{background:rgba(253,203,110,0.15);color:var(--orange)}
+.tag-critical{background:rgba(225,112,85,0.2);color:var(--red)}
+.tag-medium{background:rgba(116,185,255,0.15);color:var(--blue)}
+.tag-low{background:rgba(0,184,148,0.15);color:var(--green)}
+.similar-item{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px 16px;margin-bottom:8px;font-size:0.9em}
+.similar-item .sim-score{color:var(--accent2);font-weight:600}
+
+/* Presets */
+.presets{display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap}
+
+/* Footer */
+.footer{text-align:center;padding:40px 0;color:var(--dim);font-size:0.85em;border-top:1px solid var(--border);margin-top:60px}
+
+/* Mobile */
+@media(max-width:768px){
+  .arch-grid{grid-template-columns:1fr;gap:12px}
+  .arrow{transform:rotate(90deg)}
+  .stats{grid-template-columns:repeat(2,1fr)}
+  .agent-row{flex-direction:column}
+  .hero h1{font-size:2em}
+}
+</style>
+</head>
+<body>
+
+<!-- Hero -->
+<div class="hero">
+  <div class="container">
+    <h1>Issue Triage Agent</h1>
+    <p>基于多 Agent 协作的 GitHub Issue 智能分诊系统</p>
+    <span class="badge">🤖 Multi-Agent · LLM-Powered · Real-time</span>
+  </div>
+</div>
+
+<!-- Stats -->
+<div class="container">
+  <div class="stats">
+    <div class="stat-card"><div class="stat-num">30s</div><div class="stat-label">平均分诊耗时</div></div>
+    <div class="stat-card"><div class="stat-num">90%</div><div class="stat-label">效率提升</div></div>
+    <div class="stat-card"><div class="stat-num">3</div><div class="stat-label">并行 Agent</div></div>
+    <div class="stat-card"><div class="stat-num">24/7</div><div class="stat-label">自动运行</div></div>
+  </div>
+</div>
+
+<!-- Architecture -->
+<div class="container section">
+  <div class="section-title">🏗️ 系统架构</div>
+  <div class="arch-grid">
+    <div class="arch-box">
+      <div class="arch-icon">🔗</div>
+      <div class="arch-label">GitHub Webhook</div>
+      <div class="arch-desc">监听新 Issue 事件<br>实时触发分诊流程</div>
+    </div>
+    <div class="arrow">→</div>
+    <div class="arch-box">
+      <div class="arch-icon">🧠</div>
+      <div class="arch-label">Orchestrator</div>
+      <div class="arch-desc">任务编排调度<br>汇总多 Agent 结果</div>
+    </div>
+    <div class="arrow">→</div>
+    <div class="arch-box">
+      <div class="arch-icon">⚡</div>
+      <div class="arch-label">自动执行</div>
+      <div class="arch-desc">打标签 · 评论 · 分配<br>闭环反馈</div>
+    </div>
+  </div>
+  <div class="arch-grid" style="grid-template-columns:repeat(3,1fr)">
+    <div class="arch-box" style="border-color:var(--red)">
+      <div class="arch-icon">🏷️</div>
+      <div class="arch-label">Agent 1 · 分类</div>
+      <div class="arch-desc">判断类型 / 优先级 / 模块<br>从仓库标签体系中匹配</div>
+    </div>
+    <div class="arch-box" style="border-color:var(--accent2)">
+      <div class="arch-icon">🔍</div>
+      <div class="arch-label">Agent 2 · 相似度</div>
+      <div class="arch-desc">语义匹配历史 Issue<br>关联已有解决方案</div>
+    </div>
+    <div class="arch-box" style="border-color:var(--green)">
+      <div class="arch-icon">👤</div>
+      <div class="arch-label">Agent 3 · 分配</div>
+      <div class="arch-desc">基于模块 + 贡献者活跃度<br>推荐最佳处理人</div>
+    </div>
+  </div>
+</div>
+
+<!-- Demo -->
+<div class="container section">
+  <div class="section-title">🎮 交互式演示</div>
+  <div class="demo-area">
+    <div class="presets">
+      <button class="btn-outline" onclick="loadPreset(0)">🐛 Bug 报告</button>
+      <button class="btn-outline" onclick="loadPreset(1)">✨ Feature 请求</button>
+      <button class="btn-outline" onclick="loadPreset(2)">❓ 技术问题</button>
+      <button class="btn-outline" onclick="loadPreset(3)">🔒 安全漏洞</button>
+    </div>
+    <div class="input-group">
+      <label>Issue 标题</label>
+      <input type="text" id="issueTitle" placeholder="例: Login page crashes on mobile Safari">
+    </div>
+    <div class="input-group">
+      <label>Issue 内容</label>
+      <textarea id="issueBody" placeholder="描述问题的详细内容、复现步骤、期望行为等..."></textarea>
+    </div>
+    <div class="input-group">
+      <label>仓库标签（逗号分隔，可自定义）</label>
+      <input type="text" id="repoLabels" value="bug, feature, question, docs, performance, security, priority:high, priority:low, area/frontend, area/backend, area/api, area/mobile" placeholder="bug, feature, question, docs">
+    </div>
+    <button class="btn" id="triageBtn" onclick="startTriage()">
+      <span>🚀</span> 开始智能分诊
+    </button>
+
+    <!-- Pipeline visualization -->
+    <div class="pipeline" id="pipeline">
+      <div class="agent-row">
+        <div class="agent-card" id="agent1">
+          <div class="agent-name">🏷️ Agent 1 · 分类</div>
+          <div class="agent-status" id="agent1-status">等待中...</div>
+          <div class="agent-result" id="agent1-result"></div>
+          <div class="progress-bar"><div class="progress-fill" id="agent1-progress"></div></div>
+        </div>
+        <div class="agent-card" id="agent2">
+          <div class="agent-name">🔍 Agent 2 · 相似度</div>
+          <div class="agent-status" id="agent2-status">等待中...</div>
+          <div class="agent-result" id="agent2-result"></div>
+          <div class="progress-bar"><div class="progress-fill" id="agent2-progress"></div></div>
+        </div>
+        <div class="agent-card" id="agent3">
+          <div class="agent-name">👤 Agent 3 · 分配</div>
+          <div class="agent-status" id="agent3-status">等待中...</div>
+          <div class="agent-result" id="agent3-result"></div>
+          <div class="progress-bar"><div class="progress-fill" id="agent3-progress"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Report -->
+    <div class="report" id="report">
+      <div class="report-header">📋 Triage Report</div>
+      <div id="reportContent"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Footer -->
+<div class="footer">
+  <div class="container">
+    Issue Triage Agent · 基于 LLM 的多 Agent 智能分诊系统<br>
+    <span style="color:var(--accent)">Hermes Agent</span> × <span style="color:var(--accent2)">Xiaomi MiMo</span>
+  </div>
+</div>
+
+<script>
+const PRESETS = [
+  {
+    title: "App crashes when uploading files larger than 10MB",
+    body: "## Bug Description\nWhen users try to upload files larger than 10MB, the application throws an unhandled exception and crashes.\n\n## Steps to Reproduce\n1. Go to upload page\n2. Select a file > 10MB\n3. Click upload\n4. App crashes with 500 error\n\n## Expected Behavior\nFile should upload successfully or show a friendly size limit error.\n\n## Environment\n- Browser: Chrome 120\n- OS: macOS Sonoma\n- Version: 2.4.1"
+  },
+  {
+    title: "Add dark mode support for the dashboard",
+    body: "## Feature Request\nMany users have requested dark mode support for the main dashboard.\n\n## Use Case\n- Users who work late at night\n- Reducing eye strain during long sessions\n- Consistency with OS-level dark mode settings\n\n## Proposed Solution\n1. Add a theme toggle in user settings\n2. Persist preference in user profile\n3. Respect system-level prefers-color-scheme\n4. Support smooth transition between themes"
+  },
+  {
+    title: "How to configure custom authentication provider?",
+    body: "I'm trying to integrate our company's SSO provider with the application, but I can't find documentation on how to configure a custom OAuth2 provider.\n\nSpecifically:\n- Where do I add the provider configuration?\n- How do I map custom claims to user roles?\n- Is there a callback URL pattern I need to follow?\n\nAny guidance would be appreciated. We're using Keycloak as our identity provider."
+  },
+  {
+    title: "SQL injection vulnerability in search endpoint",
+    body: "## Security Issue\nThe `/api/search` endpoint is vulnerable to SQL injection through the `q` parameter.\n\n## Proof of Concept\n```\nGET /api/search?q=' UNION SELECT username,password FROM users--\n```\n\nThis returns user credentials from the database.\n\n## Severity\nCritical — this exposes all user data through an unauthenticated endpoint.\n\n## Recommended Fix\nUse parameterized queries instead of string concatenation in the search handler."
+  }
+];
+
+// Simulated analysis results
+function analyzeIssue(title, body, labels) {
+  const text = (title + " " + body).toLowerCase();
+  const labelArr = labels.split(",").map(l => l.trim());
+  
+  // Classification
+  let category, priority, module, conf;
+  if (text.includes("crash") || text.includes("bug") || text.includes("error") || text.includes("exception") || text.includes("vulnerability") || text.includes("injection")) {
+    category = "bug";
+    priority = text.includes("critical") || text.includes("security") || text.includes("injection") ? "critical" : "high";
+    conf = 0.92;
+  } else if (text.includes("feature") || text.includes("add ") || text.includes("support") || text.includes("request")) {
+    category = "feature";
+    priority = "medium";
+    conf = 0.88;
+  } else if (text.includes("how") || text.includes("?") || text.includes("configure") || text.includes("documentation")) {
+    category = "question";
+    priority = "low";
+    conf = 0.85;
+  } else {
+    category = "bug";
+    priority = "medium";
+    conf = 0.65;
+  }
+  
+  if (text.includes("frontend") || text.includes("ui") || text.includes("page") || text.includes("dashboard") || text.includes("dark mode")) module = "area/frontend";
+  else if (text.includes("api") || text.includes("endpoint") || text.includes("search")) module = "area/api";
+  else if (text.includes("mobile") || text.includes("ios") || text.includes("android")) module = "area/mobile";
+  else if (text.includes("auth") || text.includes("login") || text.includes("sso") || text.includes("oauth")) module = "area/auth";
+  else if (text.includes("upload") || text.includes("file") || text.includes("storage")) module = "area/backend";
+  else module = "area/backend";
+  
+  // Similar issues
+  const similarPool = [
+    {n: 1247, title: "File upload fails for large images", score: 0.82},
+    {n: 983, title: "500 error on file upload endpoint", score: 0.76},
+    {n: 2105, title: "Add theme switching support", score: 0.88},
+    {n: 1567, title: "Dark mode for settings page", score: 0.71},
+    {n: 891, title: "Custom OAuth2 provider documentation", score: 0.85},
+    {n: 2340, title: "SQL injection in user query endpoint", score: 0.91},
+    {n: 1122, title: "Search API parameter sanitization", score: 0.78},
+  ];
+  
+  let similar = [];
+  if (category === "bug") {
+    similar = text.includes("upload") ? [similarPool[0], similarPool[1]] :
+              text.includes("security") || text.includes("injection") ? [similarPool[5], similarPool[6]] :
+              [similarPool[0]];
+  } else if (category === "feature") {
+    similar = [similarPool[2], similarPool[3]];
+  } else {
+    similar = [similarPool[4]];
+  }
+  
+  // Assignment
+  const contributors = [
+    {name: "alice", area: "frontend"},
+    {name: "bob", area: "backend"},
+    {name: "charlie", area: "api"},
+    {name: "diana", area: "security"},
+    {name: "eve", area: "mobile"},
+  ];
+  
+  let assignee;
+  if (module.includes("frontend")) assignee = contributors[0];
+  else if (module.includes("api")) assignee = contributors[2];
+  else if (module.includes("auth") || module.includes("security")) assignee = contributors[3];
+  else if (module.includes("mobile")) assignee = contributors[4];
+  else assignee = contributors[1];
+  
+  return {category, priority, module, conf, similar, assignee};
+}
+
+const PRESETS_LABELS = [
+  "bug, feature, question, area/frontend, area/backend, area/api, priority:high, priority:low",
+  "bug, feature, question, area/frontend, area/backend, area/ui, priority:high, priority:medium",
+  "bug, feature, question, docs, area/auth, area/api, area/backend",
+  "bug, security, priority:critical, priority:high, area/api, area/backend, area/auth"
+];
+
+function loadPreset(i) {
+  document.getElementById("issueTitle").value = PRESETS[i].title;
+  document.getElementById("issueBody").value = PRESETS[i].body;
+  document.getElementById("repoLabels").value = PRESETS_LABELS[i];
+}
+
+async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+async function animateAgent(id, duration) {
+  const card = document.getElementById("agent" + id);
+  const status = document.getElementById("agent" + id + "-status");
+  const progress = document.getElementById("agent" + id + "-progress");
+  
+  card.classList.add("active");
+  status.innerHTML = '<span class="spinner"></span> 分析中...';
+  
+  let pct = 0;
+  const interval = setInterval(() => {
+    pct += Math.random() * 15;
+    if (pct > 95) pct = 95;
+    progress.style.width = pct + "%";
+  }, duration / 20);
+  
+  await sleep(duration);
+  clearInterval(interval);
+  progress.style.width = "100%";
+  card.classList.remove("active");
+  card.classList.add("done");
+}
+
+async function startTriage() {
+  const title = document.getElementById("issueTitle").value.trim();
+  const body = document.getElementById("issueBody").value.trim();
+  const labels = document.getElementById("repoLabels").value.trim();
+  
+  if (!title) { alert("请输入 Issue 标题"); return; }
+  
+  const btn = document.getElementById("triageBtn");
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> 分诊中...';
+  
+  // Reset
+  document.getElementById("pipeline").classList.add("active");
+  document.getElementById("report").classList.remove("active");
+  for (let i = 1; i <= 3; i++) {
+    const card = document.getElementById("agent" + i);
+    card.classList.remove("active", "done");
+    document.getElementById("agent" + i + "-status").textContent = "等待中...";
+    document.getElementById("agent" + i + "-result").style.display = "none";
+    document.getElementById("agent" + i + "-progress").style.width = "0";
+  }
+  
+  await sleep(500);
+  
+  // Run agents in parallel (simulated)
+  const result = analyzeIssue(title, body, labels);
+  
+  const p1 = animateAgent(1, 2000 + Math.random() * 1000);
+  const p2 = animateAgent(2, 2500 + Math.random() * 1500);
+  const p3 = animateAgent(3, 1800 + Math.random() * 1000);
+  
+  // Set results as agents complete
+  setTimeout(() => {
+    const r1 = document.getElementById("agent1-result");
+    r1.style.display = "block";
+    r1.innerHTML = `<strong>${result.category}</strong> · ${result.priority} · ${result.module}<br>置信度: ${(result.conf * 100).toFixed(0)}%`;
+    document.getElementById("agent1-status").textContent = "✅ 完成";
+  }, 2200);
+  
+  setTimeout(() => {
+    const r2 = document.getElementById("agent2-result");
+    r2.style.display = "block";
+    r2.innerHTML = result.similar.map(s => `#${s.n} (${(s.score*100).toFixed(0)}%)`).join("<br>") || "无相似 Issue";
+    document.getElementById("agent2-status").textContent = `✅ 找到 ${result.similar.length} 个`;
+  }, 3000);
+  
+  setTimeout(() => {
+    const r3 = document.getElementById("agent3-result");
+    r3.style.display = "block";
+    r3.innerHTML = `推荐: <strong>@${result.assignee.name}</strong><br>擅长: ${result.assignee.area}`;
+    document.getElementById("agent3-status").textContent = "✅ 完成";
+  }, 2000);
+  
+  await Promise.all([p1, p2, p3]);
+  await sleep(500);
+  
+  // Show report
+  const priColors = {critical:"tag-critical",high:"tag-high",medium:"tag-medium",low:"tag-low"};
+  const catColors = {bug:"tag-bug",feature:"tag-feature",question:"tag-bug",security:"tag-bug"};
+  
+  let html = `
+    <div class="report-row">
+      <span class="tag ${catColors[result.category] || 'tag-bug'}">${result.category}</span>
+      <span class="tag ${priColors[result.priority] || 'tag-medium'}">${result.priority}</span>
+      <span class="tag" style="background:rgba(108,92,231,0.1);color:var(--accent)">${result.module}</span>
+      <span class="tag" style="background:rgba(0,206,201,0.1);color:var(--accent2)">置信度 ${(result.conf*100).toFixed(0)}%</span>
+    </div>
+  `;
+  
+  if (result.similar.length) {
+    html += `<div style="margin:16px 0 8px;font-weight:600;font-size:0.95em">🔗 相似历史 Issue</div>`;
+    result.similar.forEach(s => {
+      html += `<div class="similar-item">#${s.n} — ${s.title} <span class="sim-score">相似度 ${(s.score*100).toFixed(0)}%</span></div>`;
+    });
+  }
+  
+  html += `
+    <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border)">
+      <strong>👤 建议处理人:</strong> @${result.assignee.name}（擅长 ${result.assignee.area}）<br>
+      <span style="color:var(--dim);font-size:0.9em">已自动打标签、添加分诊评论、分配 Assignee</span>
+    </div>
+  `;
+  
+  document.getElementById("reportContent").innerHTML = html;
+  document.getElementById("report").classList.add("active");
+  
+  btn.disabled = false;
+  btn.innerHTML = '<span>🚀</span> 重新分诊';
+}
+</script>
+</body>
+</html>
