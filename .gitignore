@@ -1,0 +1,9 @@
+venv/
+__pycache__/
+*.pyc
+*.png
+deploy/
+.env
+step*.png
+demo_running.png
+demo_screenshot.png
